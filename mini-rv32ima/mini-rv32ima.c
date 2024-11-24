@@ -40,6 +40,7 @@ static int ReadKBByte();
 #include "mini-rv32ima.h"
 
 uint8_t * ram_image = 0;
+uint8_t * flash_image = NULL;
 struct MiniRV32IMAState * core;
 const char * kernel_command_line = 0;
 
@@ -56,7 +57,7 @@ int main( int argc, char ** argv )
 	int single_step = 0;
 	int dtb_ptr = 0;
 	const char * image_file_name = 0;
-	const char * dtb_file_name = 0;
+	const char * dtb_file_name = "disable";
 	for( i = 1; i < argc; i++ )
 	{
 		const char * param = argv[i];
@@ -117,18 +118,34 @@ restart:
 		fseek( f, 0, SEEK_END );
 		long flen = ftell( f );
 		fseek( f, 0, SEEK_SET );
+
+		memset( ram_image, 0, ram_amt );
+#ifdef IMAGE_ON_RAM
 		if( flen > ram_amt )
 		{
 			fprintf( stderr, "Error: Could not fit RAM image (%ld bytes) into %d\n", flen, ram_amt );
 			return -6;
 		}
 
-		memset( ram_image, 0, ram_amt );
 		if( fread( ram_image, flen, 1, f ) != 1)
 		{
 			fprintf( stderr, "Error: Could not load image.\n" );
 			return -7;
 		}
+#else
+        if (flen > MINIRV32_FLASH_SIZE)
+        {
+            fprintf(stderr, "Error: Could not fit FLASH image (%ld bytes) into %d\n", flen, MINIRV32_FLASH_SIZE);
+        }
+
+		flash_image = malloc(flen);
+
+		if( fread( flash_image, flen, 1, f ) != 1)
+		{
+			fprintf( stderr, "Error: Could not load image.\n" );
+			return -7;
+		}
+#endif
 		fclose( f );
 
 		if( dtb_file_name )
@@ -173,7 +190,7 @@ restart:
 
 	// The core lives at the end of RAM.
 	core = (struct MiniRV32IMAState *)(ram_image + ram_amt - sizeof( struct MiniRV32IMAState ));
-	core->pc = MINIRV32_RAM_IMAGE_OFFSET;
+	core->pc = 0; // MINIRV32_RAM_IMAGE_OFFSET;
 	core->regs[10] = 0x00; //hart ID
 	core->regs[11] = dtb_ptr?(dtb_ptr+MINIRV32_RAM_IMAGE_OFFSET):0; //dtb_pa (Must be valid pointer) (Should be pointer to dtb)
 	core->extraflags |= 3; // Machine-mode.
@@ -207,7 +224,11 @@ restart:
 		if( single_step )
 			DumpState( core, ram_image);
 
+#ifdef IMAGE_ON_RAM
 		int ret = MiniRV32IMAStep( core, ram_image, 0, elapsedUs, instrs_per_flip ); // Execute upto 1024 cycles before breaking out.
+#else
+		int ret = MiniRV32IMAStep( core, flash_image, ram_image, 0, elapsedUs, instrs_per_flip ); // Execute upto 1024 cycles before breaking out.
+#endif
 		switch( ret )
 		{
 			case 0: break;
@@ -402,15 +423,6 @@ static uint32_t HandleControlStore( uint32_t addy, uint32_t val )
 		printf( "%c", val );
 		fflush( stdout );
 	}
-	else if( addy == 0x11004004 ) //CLNT
-		core->timermatchh = val;
-	else if( addy == 0x11004000 ) //CLNT
-		core->timermatchl = val;
-	else if( addy == 0x11100000 ) //SYSCON (reboot, poweroff, etc.)
-	{
-		core->pc = core->pc + 4;
-		return val; // NOTE: PC will be PC of Syscon.
-	}
 	return 0;
 }
 
@@ -422,10 +434,6 @@ static uint32_t HandleControlLoad( uint32_t addy )
 		return 0x60 | IsKBHit();
 	else if( addy == 0x10000000 && IsKBHit() )
 		return ReadKBByte();
-	else if( addy == 0x1100bffc ) // https://chromitem-soc.readthedocs.io/en/latest/clint.html
-		return core->timerh;
-	else if( addy == 0x1100bff8 )
-		return core->timerl;
 	return 0;
 }
 

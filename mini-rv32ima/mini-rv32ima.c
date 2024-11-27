@@ -6,24 +6,26 @@
 #include <string.h>
 #include <math.h>
 
+#define WEBASM
+#ifdef WEBASM
+#include "sos.h"
+#endif
+
 #include "default64mbdtc.h"
 
 // Just default RAM amount is 64MB.
-uint32_t ram_amt = 64*1024*1024;
+// uint32_t ram_amt = 64*1024*1024;
+uint32_t ram_amt = 2*1024;
 int fail_on_all_faults = 0;
 
+#ifndef WEBASM
 static int64_t SimpleReadNumberInt( const char * number, int64_t defaultNumber );
+#endif
+
 static uint64_t GetTimeMicroseconds();
 static void ResetKeyboardInput();
 static void CaptureKeyboardInput();
-static uint32_t HandleException( uint32_t ir, uint32_t retval );
-static uint32_t HandleControlStore( uint32_t addy, uint32_t val );
-static uint32_t HandleControlLoad( uint32_t addy );
-static void HandleOtherCSRWrite( uint8_t * image, uint16_t csrno, uint32_t value );
-static int32_t HandleOtherCSRRead( uint8_t * image, uint16_t csrno );
 static void MiniSleep();
-static int IsKBHit();
-static int ReadKBByte();
 
 // This is the functionality we want to override in the emulator.
 //  think of this as the way the emulator's processor is connected to the outside world.
@@ -31,11 +33,6 @@ static int ReadKBByte();
 #define MINIRV32_DECORATE  static
 #define MINI_RV32_RAM_SIZE ram_amt
 #define MINIRV32_IMPLEMENTATION
-#define MINIRV32_POSTEXEC( pc, ir, retval ) { if( retval > 0 ) { if( fail_on_all_faults ) { printf( "FAULT\n" ); return 3; } else retval = HandleException( ir, retval ); } }
-#define MINIRV32_HANDLE_MEM_STORE_CONTROL( addy, val ) if( HandleControlStore( addy, val ) ) return val;
-#define MINIRV32_HANDLE_MEM_LOAD_CONTROL( addy, rval ) rval = HandleControlLoad( addy );
-#define MINIRV32_OTHERCSR_WRITE( csrno, value ) HandleOtherCSRWrite( image, csrno, value );
-#define MINIRV32_OTHERCSR_READ( csrno, value ) value = HandleOtherCSRRead( image, csrno );
 
 #include "mini-rv32ima.h"
 
@@ -48,16 +45,20 @@ static void DumpState( struct MiniRV32IMAState * core, uint8_t * ram_image );
 
 int main( int argc, char ** argv )
 {
-	int i;
 	long long instct = -1;
-	int show_help = 0;
 	int time_divisor = 1;
 	int fixed_update = 0;
 	int do_sleep = 1;
 	int single_step = 0;
 	int dtb_ptr = 0;
+#ifndef WEBASM
+	int i;
+	int show_help = 0;
 	const char * image_file_name = 0;
+#endif
 	const char * dtb_file_name = "disable";
+
+#ifndef WEBASM
 	for( i = 1; i < argc; i++ )
 	{
 		const char * param = argv[i];
@@ -100,6 +101,8 @@ int main( int argc, char ** argv )
 		return 1;
 	}
 
+#endif
+
 	ram_image = malloc( ram_amt );
 	if( !ram_image )
 	{
@@ -109,6 +112,9 @@ int main( int argc, char ** argv )
 
 restart:
 	{
+#ifdef WEBASM
+        flash_image = _sos_h_data;
+#else
 		FILE * f = fopen( image_file_name, "rb" );
 		if( !f || ferror( f ) )
 		{
@@ -184,6 +190,7 @@ restart:
 				strncpy( (char*)( ram_image + dtb_ptr + 0xc0 ), kernel_command_line, 54 );
 			}
 		}
+#endif
 	}
 
 	CaptureKeyboardInput();
@@ -282,51 +289,6 @@ static uint64_t GetTimeMicroseconds()
 	return ((uint64_t)li.QuadPart * 1000000LL) / (uint64_t)lpf.QuadPart;
 }
 
-
-static int IsKBHit()
-{
-	return _kbhit();
-}
-
-static int ReadKBByte()
-{
-	// This code is kind of tricky, but used to convert windows arrow keys
-	// to VT100 arrow keys.
-	static int is_escape_sequence = 0;
-	int r;
-	if( is_escape_sequence == 1 )
-	{
-		is_escape_sequence++;
-		return '[';
-	}
-
-	r = _getch();
-
-	if( is_escape_sequence )
-	{
-		is_escape_sequence = 0;
-		switch( r )
-		{
-			case 'H': return 'A'; // Up
-			case 'P': return 'B'; // Down
-			case 'K': return 'D'; // Left
-			case 'M': return 'C'; // Right
-			case 'G': return 'H'; // Home
-			case 'O': return 'F'; // End
-			default: return r; // Unknown code.
-		}
-	}
-	else
-	{
-		switch( r )
-		{
-			case 13: return 10; //cr->lf
-			case 224: is_escape_sequence = 1; return 27; // Escape arrow keys
-			default: return r;
-		}
-	}
-}
-
 #else
 
 #include <sys/ioctl.h>
@@ -375,108 +337,9 @@ static uint64_t GetTimeMicroseconds()
 	return tv.tv_usec + ((uint64_t)(tv.tv_sec)) * 1000000LL;
 }
 
-static int is_eofd;
-
-static int ReadKBByte()
-{
-	if( is_eofd ) return 0xffffffff;
-	char rxchar = 0;
-	int rread = read(fileno(stdin), (char*)&rxchar, 1);
-
-	if( rread > 0 ) // Tricky: getchar can't be used with arrow keys.
-		return rxchar;
-	else
-		return -1;
-}
-
-static int IsKBHit()
-{
-	if( is_eofd ) return -1;
-	int byteswaiting;
-	ioctl(0, FIONREAD, &byteswaiting);
-	if( !byteswaiting && write( fileno(stdin), 0, 0 ) != 0 ) { is_eofd = 1; return -1; } // Is end-of-file for 
-	return !!byteswaiting;
-}
-
-
 #endif
 
-
-//////////////////////////////////////////////////////////////////////////
-// Rest of functions functionality
-//////////////////////////////////////////////////////////////////////////
-
-static uint32_t HandleException( uint32_t ir, uint32_t code )
-{
-	// Weird opcode emitted by duktape on exit.
-	if( code == 3 )
-	{
-		// Could handle other opcodes here.
-	}
-	return code;
-}
-
-static uint32_t HandleControlStore( uint32_t addy, uint32_t val )
-{
-	if( addy == 0x10000000 ) //UART 8250 / 16550 Data Buffer
-	{
-		printf( "%c", val );
-		fflush( stdout );
-	}
-	return 0;
-}
-
-
-static uint32_t HandleControlLoad( uint32_t addy )
-{
-	// Emulating a 8250 / 16550 UART
-	if( addy == 0x10000005 )
-		return 0x60 | IsKBHit();
-	else if( addy == 0x10000000 && IsKBHit() )
-		return ReadKBByte();
-	return 0;
-}
-
-static void HandleOtherCSRWrite( uint8_t * image, uint16_t csrno, uint32_t value )
-{
-	if( csrno == 0x136 )
-	{
-		printf( "%d", value ); fflush( stdout );
-	}
-	if( csrno == 0x137 )
-	{
-		printf( "%08x", value ); fflush( stdout );
-	}
-	else if( csrno == 0x138 )
-	{
-		//Print "string"
-		uint32_t ptrstart = value - MINIRV32_RAM_IMAGE_OFFSET;
-		uint32_t ptrend = ptrstart;
-		if( ptrstart >= ram_amt )
-			printf( "DEBUG PASSED INVALID PTR (%08x)\n", value );
-		while( ptrend < ram_amt )
-		{
-			if( image[ptrend] == 0 ) break;
-			ptrend++;
-		}
-		if( ptrend != ptrstart )
-			fwrite( image + ptrstart, ptrend - ptrstart, 1, stdout );
-	}
-	else if( csrno == 0x139 )
-	{
-		putchar( value ); fflush( stdout );
-	}
-}
-
-static int32_t HandleOtherCSRRead( uint8_t * image, uint16_t csrno )
-{
-	if( csrno == 0x140 )
-	{
-		if( !IsKBHit() ) return -1;
-		return ReadKBByte();
-	}
-	return 0;
-}
+#ifndef WEBASM
 
 static int64_t SimpleReadNumberInt( const char * number, int64_t defaultNumber )
 {
@@ -502,6 +365,8 @@ static int64_t SimpleReadNumberInt( const char * number, int64_t defaultNumber )
 		return ret;
 	}
 }
+
+#endif
 
 static void DumpState( struct MiniRV32IMAState * core, uint8_t * ram_image )
 {

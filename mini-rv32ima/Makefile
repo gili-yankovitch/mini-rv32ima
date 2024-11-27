@@ -1,11 +1,13 @@
 all : mini-rv32ima mini-rv32ima.flt
 
-mini-rv32ima : mini-rv32ima.c mini-rv32ima.h default64mbdtc.h
+SRCS:= mini-rv32ima.c decoder.c mmio.c spi.c w25q.c
+# mini-rv32ima.c decoder.c mini-rv32ima.h mmio.h default64mbdtc.h
+mini-rv32ima : ${SRCS}
 	# for debug
-	gcc -o $@ $< -g -O2 -Wall
-	gcc -o $@.tiny $< -Os -ffunction-sections -fdata-sections -Wl,--gc-sections -fwhole-program -s
+	gcc -o $@ ${SRCS} -g -O2 -Wall
+	# gcc -o $@.tiny $< -Os -ffunction-sections -fdata-sections -Wl,--gc-sections -fwhole-program -s
 
-mini-rv32ima.flt : mini-rv32ima.c mini-rv32ima.h
+mini-rv32ima.flt : mini-rv32ima.c mini-rv32ima.h mmio.h
 	../buildroot/output/host/bin/riscv32-buildroot-linux-uclibc-gcc -O4 -funroll-loops -s -march=rv32ima -mabi=ilp32 -fPIC $< -Wl,-elf2flt=-r -o $@
 
 # Deply with:  make clean all && cp mini-rv32ima.flt ../buildroot/output/target/root/ && make -C .. toolchain && make testkern

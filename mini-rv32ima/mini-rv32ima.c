@@ -38,7 +38,8 @@ static void MiniSleep();
 
 uint8_t * ram_image = 0;
 uint8_t * flash_image = NULL;
-struct MiniRV32IMAState * core;
+struct MiniRV32IMAState _core;
+struct MiniRV32IMAState * core = &_core;
 const char * kernel_command_line = 0;
 
 static void DumpState( struct MiniRV32IMAState * core, uint8_t * ram_image );
@@ -196,7 +197,7 @@ restart:
 	CaptureKeyboardInput();
 
 	// The core lives at the end of RAM.
-	core = (struct MiniRV32IMAState *)(ram_image + ram_amt - sizeof( struct MiniRV32IMAState ));
+	// core = (struct MiniRV32IMAState *)(ram_image + ram_amt - sizeof( struct MiniRV32IMAState ));
 	core->pc = 0; // MINIRV32_RAM_IMAGE_OFFSET;
 	core->regs[10] = 0x00; //hart ID
 	core->regs[11] = dtb_ptr?(dtb_ptr+MINIRV32_RAM_IMAGE_OFFSET):0; //dtb_pa (Must be valid pointer) (Should be pointer to dtb)

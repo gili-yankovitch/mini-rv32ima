@@ -8,6 +8,7 @@ struct spi_regs_s
     uint32_t SPI_CTLR1;
     uint32_t SPI_CTLR2;
     uint32_t SPI_STATR;
+    uint32_t SPI_DATAR;
     uint32_t SPI_CRCR;
     uint32_t SPI_RCRCR;
     uint32_t SPI_TCRCR;

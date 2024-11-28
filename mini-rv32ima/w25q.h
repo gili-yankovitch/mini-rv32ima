@@ -3,6 +3,6 @@
 
 #define W25Q
 
-int w25q_write_device(uint16_t val);
+uint32_t w25q_write_device(uint16_t val);
 
 #endif

@@ -392,6 +392,7 @@ uint32_t mmio_get(uint32_t addr, int res)
 #endif
     if (i < 0)
     {
+        fprintf(stderr, "Unmapped memory address: 0x%x\n", addr);
         goto error;
     }
 

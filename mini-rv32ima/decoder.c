@@ -162,7 +162,8 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
                                 DECODER(ir, 0b1111, 7, 6) |
                                 DECODER(ir, 0b11, 11, 4);
 
-                    REG(rd) += imm;
+
+                    REG(rd) = REG(REGSP) + imm;
 
                     break;
                 }
@@ -171,6 +172,8 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
                 {
                     uint32_t imm = ((ir & (1 << 5)) >> 7) | ((ir & (0b11111 << 2)) >> 2);
                     uint32_t reg = (ir & (0b11111 << 7)) >> 7;
+
+                    fprintf(stderr, "Loading reg 0x%x with imm 0x%x\n", reg, imm);
 
                     REG(reg) = imm;
                     break;
@@ -187,7 +190,7 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
                         imm |= 0xffffffc0;
                     }
 
-                    // fprintf(stderr, "Adding immediate %x to register %x (0x%x)\n", imm , rs1d, REG(rs1d));
+                    fprintf(stderr, "Adding immediate %x to register %x (0x%x)\n", imm , rs1d, REG(rs1d));
 
                     REG(rs1d) += imm;
 
@@ -378,6 +381,7 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
                     }
                     else
                     {
+                        // fprintf(stderr, "Adding reg%d (0x%x) with reg%d (0x%x)\n", rs1d, REG(rs1d), rs2, REG(rs2));
                         // ADD
                         REG(rs1d) += REG(rs2);
                     }
@@ -518,6 +522,8 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
             // Already handled in the above switch
             if (!long_inst)
             {
+                // fprintf(stderr, "a5 = 0x%x\n", REG(15));
+                fprintf(stderr, "t1 = 0x%x\n", REG(6));
                 pc += 2;
 
                 goto next;
@@ -577,8 +583,6 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
 					int32_t imm_se = imm | (( imm & 0x800 )?0xfffff000:0);
 					uint32_t rsval = rs1 + imm_se;
 
-					// fprintf(stderr, "LOAD from: 0x%x (reg %x)\n", rs1, (ir >> 15) & 0x1f);
-
 					rsval -= MINIRV32_RAM_IMAGE_OFFSET;
 					if( rsval >= ram_amt - 3 )
 					{
@@ -618,6 +622,8 @@ load:
 							default: trap = (2+1);
 						}
 					}
+
+					// fprintf(stderr, "LOAD from: 0x%x (reg %d) = 0x%x\n", rs1, (ir >> 15) & 0x1f, rval);
 					break;
 				}
 				case 0x23: // Store 0b0100011
@@ -667,6 +673,7 @@ load:
 					else
 					{
 store:
+                        fprintf(stderr, "Writing 0x%x to addr 0x%x\n", rs2, addy);
 						switch( ( ir >> 12 ) & 0x7 )
 						{
 							//SB, SH, SW
@@ -686,6 +693,8 @@ store:
 					uint32_t rs1 = REG((ir >> 15) & 0x1f);
 					uint32_t is_reg = !!( ir & 0x20 );
 					uint32_t rs2 = is_reg ? REG(imm & 0x1f) : imm;
+
+					fprintf(stderr, "Op-immediate rs1 = 0x%x rs2 = 0x%x imm = 0x%x\n", rs1, rs2, imm);
 
 					if( is_reg && ( ir & 0x02000000 ) )
 					{
@@ -707,7 +716,7 @@ store:
 					}
 					else
 					{
-					    // fprintf(stderr, "Arith rs1 = 0x%x rs2 = 0x%x\n", rs1, rs2);
+					    fprintf(stderr, "Arith a5 = 0x%x rs1 = 0x%x subcmd = 0x%x\n", REG(15), (ir >> 15) & 0x1f, (ir>>12)&7);
 						switch( (ir>>12)&7 ) // These could be either op-immediate or op commands.  Be careful.
 						{
 							case 0: rval = (is_reg && (ir & 0x40000000) ) ? ( rs1 - rs2 ) : ( rs1 + rs2 ); break; 
@@ -888,6 +897,7 @@ store:
 
 		MINIRV32_POSTEXEC( pc, ir, trap );
 
+        fprintf(stderr, "t1 = 0x%x\n", REG(6));
 		pc += 4;
 
 next:

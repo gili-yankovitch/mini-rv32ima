@@ -12,8 +12,9 @@ struct spi_regs_s spi = {
     .SPI_CTLR1 = 0x0,
     .SPI_CTLR2 = 0x0,
     .SPI_STATR = 0x2,
-    .SPI_CRCR = 0x0,
-    .SPI_RCRCR = 0x7,
+    .SPI_DATAR = 0x0,
+    .SPI_CRCR = 0x7,
+    .SPI_RCRCR = 0x0,
     .SPI_TCRCR = 0x0,
     .SPI_HSCR = 0x0
 };
@@ -24,9 +25,9 @@ enum spi_bit_mode_e spi_data_mode()
     return (spi.SPI_CTLR1 & (0b1 << 11)) ? E_SPI_16BIT : E_SPI_8BIT;
 }
 
-static int spi_write_device(uint32_t val)
+static uint32_t spi_write_device(uint32_t val)
 {
-    int res;
+    uint32_t res;
 
 #ifdef W25Q
     res = w25q_write_device(val);
@@ -42,19 +43,16 @@ void spi_write(struct memarea_s * area, uint32_t addr, uint32_t val, int res)
     // SPI_DATAR
     if (addr == area->addr + 0x0c)
     {
-        int res = spi_write_device((spi_data_mode() == E_SPI_16BIT) ? val & 0xffff : val & 0xff);
+        uint32_t res = spi_write_device((spi_data_mode() == E_SPI_16BIT) ? val & 0xffff : val & 0xff);
 
-        // Write TX buffer cleared
-        if (res > 0)
-        {
-            // TXE - Tx buffer empty
-            spi.SPI_STATR &= ~0b10;
+        // TXE - Tx buffer empty
+        spi.SPI_STATR |= 0b10;
 
-            // Write to buffer what was returned
+        // Write to buffer what was returned
+        spi.SPI_DATAR = res;
 
-            // RXNE - Rx buffer not empty
-            spi.SPI_STATR |= 0b1;
-        }
+        // RXNE - Rx buffer not empty
+        spi.SPI_STATR |= 0b1;
     }
     return;
 }

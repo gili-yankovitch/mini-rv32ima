@@ -17,6 +17,15 @@ static uint32_t rspidx = 0;
 static uint32_t rsplen = 0;
 static bool rsp = false;
 
+static void resetBuffers()
+{
+    memset(rspbuf, 0, rspidx + 1);
+    memset(reqbuf, 0, idx + 1);
+    idx = 0;
+    rspidx = 0;
+    rsp = false;
+}
+
 uint32_t w25q_write_device(uint16_t val)
 {
     uint32_t ret = 0;
@@ -59,11 +68,17 @@ uint32_t w25q_write_device(uint16_t val)
             // Capacity
             rspbuf[3] = 0x18;
 
+            // Respond
+            rsp = true;
+
             break;
         }
 
         default:
         {
+            // Reset buffer - nothing we can handle
+            resetBuffers();
+
             goto done;
         }
     }
@@ -82,7 +97,7 @@ output:
     // Finished processing he command
     if (rspidx >= rsplen)
     {
-        rsp = false;
+        resetBuffers();
     }
 
 done:

@@ -30,6 +30,8 @@
 #define REGSET( x, val ) { state->regs[x] = val; }
 #endif
 
+static uint32_t steps = 0;
+
 #ifndef MINIRV32_NO_RVC
 
 enum rvc_inst_e
@@ -157,9 +159,9 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
                 {
                     uint32_t rd = REGTAG(DECODER(ir, 0b111, 2, 0));
                     uint32_t imm =
-                                DECODER(ir, 0b1, 5, 3) |
-                                DECODER(ir, 0b1, 6, 2) |
-                                DECODER(ir, 0b1111, 7, 6) |
+                                DECODER(ir, 0b1, 5, 3)      |
+                                DECODER(ir, 0b1, 6, 2)      |
+                                DECODER(ir, 0b1111, 7, 6)   |
                                 DECODER(ir, 0b11, 11, 4);
 
 
@@ -173,7 +175,7 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
                     uint32_t imm = ((ir & (1 << 5)) >> 7) | ((ir & (0b11111 << 2)) >> 2);
                     uint32_t reg = (ir & (0b11111 << 7)) >> 7;
 
-                    fprintf(stderr, "Loading reg 0x%x with imm 0x%x\n", reg, imm);
+                    // fprintf(stderr, "Loading reg 0x%x with imm 0x%x\n", reg, imm);
 
                     REG(reg) = imm;
                     break;
@@ -190,7 +192,7 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
                         imm |= 0xffffffc0;
                     }
 
-                    fprintf(stderr, "Adding immediate %x to register %x (0x%x)\n", imm , rs1d, REG(rs1d));
+                    // fprintf(stderr, "Adding immediate %x to register %x (0x%x)\n", imm , rs1d, REG(rs1d));
 
                     REG(rs1d) += imm;
 
@@ -250,7 +252,7 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
                         REG(rd) = imm;
                     }
 
-                    fprintf(stderr, "\t Load upper-immediate: 0x%x\n", imm);
+                    // fprintf(stderr, "\t Load upper-immediate: 0x%x\n", imm);
                     break;
                 }
 
@@ -260,7 +262,7 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
                     uint32_t imm = DECODER(ir, 0b11, 7, 6) | DECODER(ir, 0b1111, 9, 2);
                     uint32_t addy = REG(REGSP) + imm;
 
-                    fprintf(stderr, "Storing to SP with offset 0x%x\n", imm);
+                    // fprintf(stderr, "Storing to SP with offset 0x%x\n", imm);
 
                     MINIRV32_STORE4(addy, REG(rs2));
                     break;
@@ -269,12 +271,12 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
                 case RVC_JAL:
                 {
                     uint32_t imm = DECODEL(ir, 0b1, 2, 5)   |
-                        DECODER(ir, 0b111, 3, 1)             |
+                        DECODER(ir, 0b111, 3, 1)            |
                         DECODEL(ir, 0b1, 6, 7)              |
-                        DECODER(ir, 0b1, 7, 6)               |
+                        DECODER(ir, 0b1, 7, 6)              |
                         DECODEL(ir, 0b1, 8, 10)             |
-                        DECODER(ir, 0b11, 9, 8)              |
-                        DECODER(ir, 0b1, 11, 4)              |
+                        DECODER(ir, 0b11, 9, 8)             |
+                        DECODER(ir, 0b1, 11, 4)             |
                         DECODER(ir, 0b1, 12, 11);
 
                     // Sign-extend?
@@ -356,7 +358,7 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
                     {
                         if (rs1d == REGRA)
                         {
-                            fprintf(stderr, "Returning to 0x%x\n", REG(rs1d));
+                            // fprintf(stderr, "Returning to 0x%x\n", REG(rs1d));
                         }
 
                         // JR
@@ -433,7 +435,7 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
                             DECODER(ir, 0b111, 4, 2) |
                             DECODER(ir, 0b1, 12, 5);
 
-                    fprintf(stderr, "Loading from SP with offset 0x%x\n", imm);
+                    // fprintf(stderr, "Loading from SP with offset 0x%x (0x%x)\n", imm, REG(REGSP) + imm);
 
                     REG(rd) = MINIRV32_LOAD4(REG(REGSP) + imm);
 
@@ -523,7 +525,9 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
             if (!long_inst)
             {
                 // fprintf(stderr, "a5 = 0x%x\n", REG(15));
-                fprintf(stderr, "t1 = 0x%x\n", REG(6));
+                // fprintf(stderr, "t1 = 0x%x\n", REG(6));
+
+                steps++;
                 pc += 2;
 
                 goto next;
@@ -673,7 +677,7 @@ load:
 					else
 					{
 store:
-                        fprintf(stderr, "Writing 0x%x to addr 0x%x\n", rs2, addy);
+                        // fprintf(stderr, "Writing 0x%x to addr 0x%x\n", rs2, addy);
 						switch( ( ir >> 12 ) & 0x7 )
 						{
 							//SB, SH, SW
@@ -694,7 +698,7 @@ store:
 					uint32_t is_reg = !!( ir & 0x20 );
 					uint32_t rs2 = is_reg ? REG(imm & 0x1f) : imm;
 
-					fprintf(stderr, "Op-immediate rs1 = 0x%x rs2 = 0x%x imm = 0x%x\n", rs1, rs2, imm);
+					// fprintf(stderr, "Op-immediate rs1 = 0x%x rs2 = 0x%x imm = 0x%x\n", rs1, rs2, imm);
 
 					if( is_reg && ( ir & 0x02000000 ) )
 					{
@@ -716,7 +720,7 @@ store:
 					}
 					else
 					{
-					    fprintf(stderr, "Arith a5 = 0x%x rs1 = 0x%x subcmd = 0x%x\n", REG(15), (ir >> 15) & 0x1f, (ir>>12)&7);
+					    // fprintf(stderr, "Arith a5 = 0x%x rs1 = 0x%x subcmd = 0x%x\n", REG(15), (ir >> 15) & 0x1f, (ir>>12)&7);
 						switch( (ir>>12)&7 ) // These could be either op-immediate or op commands.  Be careful.
 						{
 							case 0: rval = (is_reg && (ir & 0x40000000) ) ? ( rs1 - rs2 ) : ( rs1 + rs2 ); break; 
@@ -897,8 +901,10 @@ store:
 
 		MINIRV32_POSTEXEC( pc, ir, trap );
 
-        fprintf(stderr, "t1 = 0x%x\n", REG(6));
-		pc += 4;
+        // fprintf(stderr, "t1 = 0x%x\n", REG(6));
+
+        steps++;
+        pc += 4;
 
 next:
         if (hw_break)

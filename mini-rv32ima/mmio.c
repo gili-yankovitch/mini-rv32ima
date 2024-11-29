@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <sys/time.h>
 
 #include "mini-rv32ima.h"
 #include "mmio.h"
@@ -145,18 +146,6 @@ struct rcc_regs_s
     .RCC_RSTSCKR = 0x0
 };
 
-typedef struct
-{
-    __IO uint32_t CTLR;
-    __IO uint32_t SR;
-    __IO uint32_t CNT;
-    uint32_t RESERVED0;
-    __IO uint32_t CMP;
-    uint32_t RESERVED1;
-} SysTick_Type;
-
-static SysTick_Type systick;
-
 void rcc_write(struct memarea_s * area, uint32_t addr, uint32_t val, int res)
 {
     // fprintf(stderr, "RCCCCC!!!! addr = 0x%x\n", addr);
@@ -250,6 +239,52 @@ void rcc_write(struct memarea_s * area, uint32_t addr, uint32_t val, int res)
 
         rcc.RCC_INTR = writeback;
     }
+}
+
+typedef struct
+{
+    __IO uint32_t CTLR;
+    __IO uint32_t SR;
+    __IO uint32_t CNT;
+    uint32_t RESERVED0;
+    __IO uint32_t CMP;
+    uint32_t RESERVED1;
+} SysTick_Type;
+
+static SysTick_Type systick;
+
+extern struct MiniRV32IMAState * core;
+
+uint32_t systick_read(struct memarea_s * area, uint32_t addr, int res)
+{
+    uint32_t val = *((uint32_t *)((uint8_t *)area->data + (addr - area->addr)));
+
+    // STK_CNTL
+    if (addr == area->addr + 0x8)
+    {
+        // 24MHz default clock
+        static uint32_t ticks = 0;
+        static struct timeval prev;
+        struct timeval cur;
+        uint32_t clock = 24 * 1024 * 1024;
+
+        gettimeofday(&cur, NULL);
+
+        if (!ticks)
+        {
+            ticks = val = (cur.tv_sec * 1000 + cur.tv_usec);
+        }
+        else
+        {
+            ticks += ((cur.tv_sec * 1000 + cur.tv_usec) - (prev.tv_sec * 1000 + prev.tv_usec)) * clock / 1000;
+        }
+
+        val = ticks;
+
+        prev = cur;
+    }
+
+    return val;
 }
 
 void flash_ctlr_write(struct memarea_s * area, uint32_t addr, uint32_t val, int res)
@@ -358,7 +393,7 @@ struct memarea_s areas[] =
         .size = sizeof(SysTick_Type),
         .data = &systick,
         .write = NULL,
-        .read = NULL
+        .read = systick_read
     }
 };
 

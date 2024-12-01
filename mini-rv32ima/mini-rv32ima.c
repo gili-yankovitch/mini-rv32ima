@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "w25q.h"
 
 #define WEBASM
 #ifdef WEBASM
@@ -214,6 +215,9 @@ restart:
 			dtb[0x13c/4] = (validram>>24) | ((( validram >> 16 ) & 0xff) << 8 ) | (((validram>>8) & 0xff ) << 16 ) | ( ( validram & 0xff) << 24 );
 		}
 	}
+
+    // Initialize peripherals
+    w25q_init();
 
 	// Image is loaded.
 	uint64_t rt;

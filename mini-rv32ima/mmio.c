@@ -38,6 +38,8 @@ struct gpio_regs_s
     uint32_t GPIO_LCKR;
 };
 
+#define PINS_PER_PORT 8
+
 struct gpio_regs_s porta = {
     .GPIO_CFGLR = 0x44444444,
     .reserved0 = 0x0,
@@ -68,9 +70,97 @@ struct gpio_regs_s portd = {
     .GPIO_LCKR = 0x0
 };
 
+struct gpio_pin_callback_s
+{
+    void (* cb)(uint32_t val);
+};
+
+static struct gpio_pin_callback_s porta_cb[PINS_PER_PORT] = { { NULL } };
+static struct gpio_pin_callback_s portc_cb[PINS_PER_PORT] = { { NULL } };
+static struct gpio_pin_callback_s portd_cb[PINS_PER_PORT] = { { NULL } };
+
+void gpio_register_porta_cb(void (*cb)(uint32_t val), uint8_t pin)
+{
+    if (pin >= PINS_PER_PORT)
+    {
+        return;
+    }
+
+    porta_cb[pin].cb = cb;
+}
+
+void gpio_register_portc_cb(void (*cb)(uint32_t val), uint8_t pin)
+{
+    if (pin >= PINS_PER_PORT)
+    {
+        return;
+    }
+
+    portc_cb[pin].cb = cb;
+}
+
+void gpio_register_portd_cb(void (*cb)(uint32_t val), uint8_t pin)
+{
+    if (pin >= PINS_PER_PORT)
+    {
+        return;
+    }
+
+    portd_cb[pin].cb = cb;
+}
+
+static void update_gpio_cb(struct gpio_pin_callback_s * cb, uint32_t val)
+{
+    int i;
+
+    for (i = 0; i < PINS_PER_PORT; ++i)
+    {
+        if (cb[i].cb)
+        {
+            if (val & (1 << i))
+            {
+                cb[i].cb(1);
+            }
+            else if (val & (1 << (i + 16)))
+            {
+                cb[i].cb(0);
+            }
+        }
+    }
+}
+
+uint32_t gpio_read(struct memarea_s * area, uint32_t addr, int res)
+{
+    uint32_t val = *((uint32_t *)((uint8_t *)&area->data + (addr - area->addr)));
+
+    fprintf(stderr, "Reading GPIO 0x%x = 0x%x\n", addr, val);
+
+    return val;
+}
 void gpio_write(struct memarea_s * area, uint32_t addr, uint32_t val, int res)
 {
-    // fprintf(stderr, "Writing GPIO!\n");
+    fprintf(stderr, "Writing GPIO %s! 0x%x (res %d) = 0x%x\n", area->name, addr, res, val);
+
+    // Port output
+    if (addr == area->addr + 0x10)
+    {
+        if (!strcmp(area->name, "PORTA"))
+        {
+            update_gpio_cb(porta_cb, val);
+        }
+
+        if (!strcmp(area->name, "PORTC"))
+        {
+            fprintf(stderr, "PORTC\n");
+            update_gpio_cb(portc_cb, val);
+        }
+
+        if (!strcmp(area->name, "PORTD"))
+        {
+            update_gpio_cb(portd_cb, val);
+        }
+    }
+
     return;
 }
 
@@ -305,6 +395,26 @@ struct flash_ctlr_s
     uint32_t FLASH_BOOT_MODEKEYR;
 } flash_ctlr;
 
+void ram_write(struct memarea_s * area, uint32_t addr, uint32_t val, int res)
+{
+    if (addr == 0x20000010)
+    {
+        fprintf(stderr, "Writing 0x%x = 0x%x\n", addr, val);
+    }
+}
+
+uint32_t ram_read(struct memarea_s * area, uint32_t addr, int res)
+{
+    uint32_t val = *((uint32_t *)((uint8_t *)area->data + (addr - area->addr)));
+
+    if (addr == 0x20000010)
+    {
+        fprintf(stderr, "Reading 0x%x = 0x%x\n", addr, val);
+    }
+
+    return val;
+}
+
 struct memarea_s areas[] =
 {
     {
@@ -328,7 +438,7 @@ struct memarea_s areas[] =
         .addr = MINIRV32_RAM_IMAGE_OFFSET,
         .size = 16 * 1024 * 1024,
         .data = NULL,
-        .write = NULL,
+        .write = ram_write,
         .read = NULL
     },
     {
@@ -337,7 +447,7 @@ struct memarea_s areas[] =
         .size = sizeof(struct gpio_regs_s),
         .data = &porta,
         .write = gpio_write,
-        .read = NULL
+        .read = gpio_read
     },
     {
         .name = "PORTC",

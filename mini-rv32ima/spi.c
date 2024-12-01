@@ -8,6 +8,8 @@
 #include "mmio.h"
 #include "spi.h"
 
+#define ntohs(x) ((((x) & 0x00ff) << 8) | (((x) & 0xff00) >> 8))
+
 struct spi_regs_s spi = {
     .SPI_CTLR1 = 0x0,
     .SPI_CTLR2 = 0x0,
@@ -43,7 +45,7 @@ void spi_write(struct memarea_s * area, uint32_t addr, uint32_t val, int res)
     // SPI_DATAR
     if (addr == area->addr + 0x0c)
     {
-        uint32_t res = spi_write_device((spi_data_mode() == E_SPI_16BIT) ? val & 0xffff : val & 0xff);
+        uint32_t res = spi_write_device((spi_data_mode() == E_SPI_16BIT) ? ntohs(val & 0xffff) : val & 0xff);
 
         // TXE - Tx buffer empty
         spi.SPI_STATR |= 0b10;

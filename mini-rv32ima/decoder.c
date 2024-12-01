@@ -587,10 +587,10 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
 					int32_t imm_se = imm | (( imm & 0x800 )?0xfffff000:0);
 					uint32_t rsval = rs1 + imm_se;
 
-					rsval -= MINIRV32_RAM_IMAGE_OFFSET;
+					// GY: rsval -= MINIRV32_RAM_IMAGE_OFFSET;
 					if( rsval >= ram_amt - 3 )
 					{
-						rsval += MINIRV32_RAM_IMAGE_OFFSET;
+						// GY: rsval += MINIRV32_RAM_IMAGE_OFFSET;
 						if( rsval >= 0x10000000 && rsval < 0x12000000 )  // UART, CLNT
 						{
 							if( rsval == 0x1100bffc ) // https://chromitem-soc.readthedocs.io/en/latest/clint.html
@@ -846,14 +846,14 @@ store:
 					uint32_t rs2 = REG((ir >> 20) & 0x1f);
 					uint32_t irmid = ( ir>>27 ) & 0x1f;
 
-					rs1 -= MINIRV32_RAM_IMAGE_OFFSET;
+					// GY: rs1 -= MINIRV32_RAM_IMAGE_OFFSET;
 
 					// We don't implement load/store from UART or CLNT with RV32A here.
 
 					if( rs1 >= ram_amt - 3 )
 					{
 						trap = (7+1); //Store/AMO access fault
-						rval = rs1 + MINIRV32_RAM_IMAGE_OFFSET;
+						rval = rs1 /* GY: + MINIRV32_RAM_IMAGE_OFFSET */;
 					}
 					else
 					{

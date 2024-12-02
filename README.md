@@ -2,6 +2,10 @@
 
 This is an extention / fork of cnlohr's [mini-rv32ima](https://github.com/cnlohr/mini-rv32ima) project.
 
+<p align = "center">
+    <img src="https://raw.githubusercontent.com/gili-yankovitch/mini-rv32ima/refs/heads/master/images/sos-wasm.png" height="500">
+</p>
+
 ## What
 
 The current objective of this specific repo is to be a WASM clone for the ch32v003 chip. It currently implements *some* of the functionality of the chip, but overall works great..

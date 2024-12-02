@@ -133,13 +133,13 @@ uint32_t gpio_read(struct memarea_s * area, uint32_t addr, int res)
 {
     uint32_t val = *((uint32_t *)((uint8_t *)&area->data + (addr - area->addr)));
 
-    fprintf(stderr, "Reading GPIO 0x%x = 0x%x\n", addr, val);
+    // fprintf(stderr, "Reading GPIO 0x%x = 0x%x\n", addr, val);
 
     return val;
 }
 void gpio_write(struct memarea_s * area, uint32_t addr, uint32_t val, int res)
 {
-    fprintf(stderr, "Writing GPIO %s! 0x%x (res %d) = 0x%x\n", area->name, addr, res, val);
+    // fprintf(stderr, "Writing GPIO %s! 0x%x (res %d) = 0x%x\n", area->name, addr, res, val);
 
     // Port output
     if (addr == area->addr + 0x10)
@@ -151,7 +151,6 @@ void gpio_write(struct memarea_s * area, uint32_t addr, uint32_t val, int res)
 
         if (!strcmp(area->name, "PORTC"))
         {
-            fprintf(stderr, "PORTC\n");
             update_gpio_cb(portc_cb, val);
         }
 
@@ -203,11 +202,11 @@ uint32_t usart_read(struct memarea_s * area, uint32_t addr, int res)
     // USART_STATR
     if (addr == area->addr + 0)
     {
-        fprintf(stderr, "USART STARTR TC: %x\n", val & 64);
+        // fprintf(stderr, "USART STARTR TC: %x\n", val & 64);
     }
     else
     {
-        fprintf(stderr, "USART read: 0x%x\n", addr);
+        // fprintf(stderr, "USART read: 0x%x\n", addr);
     }
 
     return val;
@@ -345,6 +344,8 @@ static SysTick_Type systick;
 
 extern struct MiniRV32IMAState * core;
 
+extern uint32_t cycle;
+
 uint32_t systick_read(struct memarea_s * area, uint32_t addr, int res)
 {
     uint32_t val = *((uint32_t *)((uint8_t *)area->data + (addr - area->addr)));
@@ -353,7 +354,7 @@ uint32_t systick_read(struct memarea_s * area, uint32_t addr, int res)
     if (addr == area->addr + 0x8)
     {
         // 24MHz default clock
-        static uint32_t ticks = 0;
+        static uint64_t ticks = 0;
         static struct timeval prev;
         struct timeval cur;
         uint32_t clock = 24 * 1024 * 1024;
@@ -362,16 +363,18 @@ uint32_t systick_read(struct memarea_s * area, uint32_t addr, int res)
 
         if (!ticks)
         {
-            ticks = val = (cur.tv_sec * 1000 + cur.tv_usec);
+            ticks = val = ((uint64_t)cur.tv_sec * 1000 + (uint64_t)cur.tv_usec);
         }
         else
         {
-            ticks += ((cur.tv_sec * 1000 + cur.tv_usec) - (prev.tv_sec * 1000 + prev.tv_usec)) * clock / 1000;
+            ticks += (((uint64_t)cur.tv_sec * 1000 + (uint64_t)cur.tv_usec) - ((uint64_t)prev.tv_sec * 1000 + (uint64_t)prev.tv_usec));
         }
 
-        val = ticks;
+        val = ticks * 8; // * clock / 24;
 
         prev = cur;
+
+        val = cycle << 4;
     }
 
     return val;
@@ -399,7 +402,7 @@ void ram_write(struct memarea_s * area, uint32_t addr, uint32_t val, int res)
 {
     if (addr == 0x20000010)
     {
-        fprintf(stderr, "Writing 0x%x = 0x%x\n", addr, val);
+        // fprintf(stderr, "Writing 0x%x = 0x%x\n", addr, val);
     }
 }
 
@@ -409,7 +412,7 @@ uint32_t ram_read(struct memarea_s * area, uint32_t addr, int res)
 
     if (addr == 0x20000010)
     {
-        fprintf(stderr, "Reading 0x%x = 0x%x\n", addr, val);
+        // fprintf(stderr, "Reading 0x%x = 0x%x\n", addr, val);
     }
 
     return val;

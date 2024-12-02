@@ -40,7 +40,7 @@ static uint32_t spi_write_device(uint32_t val)
 
 void spi_write(struct memarea_s * area, uint32_t addr, uint32_t val, int res)
 {
-    fprintf(stderr, "Writing SPI 0x%x = 0x%x (res: %d)\n", addr, val, res);
+    // fprintf(stderr, "Writing SPI 0x%x = 0x%x (res: %d)\n", addr, val, res);
 
     // SPI_DATAR
     if (addr == area->addr + 0x0c)
@@ -70,7 +70,7 @@ uint32_t spi_read(struct memarea_s * area, uint32_t addr, int res)
         spi.SPI_STATR &= ~0b1;
     }
 
-    fprintf(stderr, "Reading SPI 0x%x = 0x%x (res: %d)\n", addr, val, res);
+    // fprintf(stderr, "Reading SPI 0x%x = 0x%x (res: %d)\n", addr, val, res);
 
     return val;
 }

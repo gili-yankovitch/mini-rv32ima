@@ -7,8 +7,7 @@
 #include <math.h>
 #include "w25q.h"
 
-#define WEBASM
-#ifdef WEBASM
+#ifdef WASM
 #include "sos.h"
 #endif
 
@@ -19,7 +18,7 @@
 uint32_t ram_amt = 2*1024;
 int fail_on_all_faults = 0;
 
-#ifndef WEBASM
+#ifndef WASM
 static int64_t SimpleReadNumberInt( const char * number, int64_t defaultNumber );
 #endif
 
@@ -53,14 +52,14 @@ int main( int argc, char ** argv )
 	int do_sleep = 1;
 	int single_step = 0;
 	int dtb_ptr = 0;
-#ifndef WEBASM
+#ifndef WASM
 	int i;
 	int show_help = 0;
 	const char * image_file_name = 0;
 #endif
 	const char * dtb_file_name = "disable";
 
-#ifndef WEBASM
+#ifndef WASM
 	for( i = 1; i < argc; i++ )
 	{
 		const char * param = argv[i];
@@ -114,7 +113,7 @@ int main( int argc, char ** argv )
 
 restart:
 	{
-#ifdef WEBASM
+#ifdef WASM
         flash_image = _sos_h_data;
 #else
 		FILE * f = fopen( image_file_name, "rb" );
@@ -241,6 +240,7 @@ restart:
 #else
 		int ret = MiniRV32IMAStep( core, flash_image, ram_image, 0, elapsedUs, instrs_per_flip ); // Execute upto 1024 cycles before breaking out.
 #endif
+
 		switch( ret )
 		{
 			case 0: break;
@@ -344,7 +344,7 @@ static uint64_t GetTimeMicroseconds()
 
 #endif
 
-#ifndef WEBASM
+#ifndef WASM
 
 static int64_t SimpleReadNumberInt( const char * number, int64_t defaultNumber )
 {

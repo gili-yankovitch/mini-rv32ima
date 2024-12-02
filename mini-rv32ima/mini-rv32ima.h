@@ -2,10 +2,6 @@
 #ifndef _MINI_RV32IMAH_H
 #define _MINI_RV32IMAH_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
     To use mini-rv32ima.h for the bare minimum, the following:
 
@@ -96,7 +92,4 @@ struct MiniRV32IMAState
 
 int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8_t * image, uint32_t vProcAddress, uint32_t elapsedUs, int count );
 
-#ifdef __cplusplus
-}
-#endif
 #endif

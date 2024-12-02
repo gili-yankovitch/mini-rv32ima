@@ -2,6 +2,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#ifdef WASM
+#include <emscripten.h>
+#endif
+
 #include <math.h>
 
 #include "mini-rv32ima.h"
@@ -76,6 +81,7 @@ enum rvc_alu_e
 #endif
 
 extern uint32_t ram_amt;
+uint32_t cycle = 0;
 
 int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8_t * image, uint32_t vProcAddress, uint32_t elapsedUs, int count )
 {
@@ -104,7 +110,7 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
 	uint32_t trap = 0;
 	uint32_t rval = 0;
 	uint32_t pc = CSR( pc );
-	uint32_t cycle = CSR( cyclel );
+	/* uint32_t */ cycle = CSR( cyclel );
 
 	if( ( CSR( mip ) & (1<<7) ) && ( CSR( mie ) & (1<<7) /*mtie*/ ) && ( CSR( mstatus ) & 0x8 /*mie*/) )
 	{
@@ -120,20 +126,13 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
 		cycle++;
 		uint32_t ofs_pc = pc; // - MINIRV32_RAM_IMAGE_OFFSET;
 
-		if (pc == 0x115c)
+#ifdef WASM
+		if (cycle % 1000 == 0)
 		{
-		    // bkpt();
+            emscripten_sleep(1);
 		}
-#if 0
-		if( ofs_pc >= ram_amt )
-		{
-            // fprintf(stderr, "%s:%d ofs_pc = 0x%x\n", __FUNCTION__, __LINE__, ofs_pc);
-            exit(1);
-			trap = 1 + 1;  // Handle access violation on instruction read.
-			break;
-		}
-		else
 #endif
+
 		if( ofs_pc & 1 )
 		{
             fprintf(stderr, "%s:%d ofs_pc = 0x%x\n", __FUNCTION__, __LINE__, ofs_pc);
@@ -143,7 +142,7 @@ int32_t MiniRV32IMAStep( struct MiniRV32IMAState * state, uint8_t * flash, uint8
 		}
 		else
 		{
-		    fprintf(stderr, "Fetching from 0x%x\n", ofs_pc);
+		    // fprintf(stderr, "Fetching from 0x%x\n", ofs_pc);
 			ir = MINIRV32_LOAD4( ofs_pc );
 			uint32_t rdid = (ir >> 7) & 0x1f;
 #ifndef MINIRV32_NO_RVC

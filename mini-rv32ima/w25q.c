@@ -355,6 +355,49 @@ static void toggle_cs(uint32_t val)
     cs = val;
 }
 
+#ifdef WASM
+
+void w25q_cmd(uint8_t * buf, size_t len)
+{
+    int i;
+    bool read_data = false;
+
+    fprintf(stderr, "Call from emscripten buf[0] = 0x%x len = %zu\n", buf[0], len);
+
+    toggle_cs(0);
+
+    // Is it data read?
+    if (buf[0] == 0x03)
+    {
+        read_data = true;
+    }
+
+    for (i = 0; i < len; ++i)
+    {
+        buf[i] = w25q_write_device(buf[i]);
+    }
+
+    toggle_cs(1);
+
+    // Print out if this is a data read
+    if (read_data)
+    {
+        for (i = 4; i < len; ++i)
+        {
+            if (((i - 4 + 1) % 16) == 0)
+            {
+                printf("\n");
+            }
+
+            printf("%02x ", buf[i]);
+        }
+    }
+
+    printf("\n");
+}
+
+#endif
+
 void w25q_init()
 {
     gpio_register_portc_cb(toggle_cs, 4);

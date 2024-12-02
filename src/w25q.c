@@ -55,7 +55,7 @@ static struct flash_data_s * get_page(uint32_t addr)
 
     for (i = 0; i < data_chunks; ++i)
     {
-        if ((data[i].addr <= addr) && (addr < data[i].addr + DATA_CHUNK_SIZE))
+        if ((data[i].addr <= addr) && (addr < (data[i].addr + DATA_CHUNK_SIZE)))
         {
             page = &data[i];
 
@@ -117,6 +117,8 @@ static void write_data(uint32_t addr, uint8_t data)
     {
         fprintf(stderr, "Error getting page for address 0x%x\n", addr);
     }
+
+    // fprintf(stderr, "Writing to page 0x%x offset 0x%x = 0x%x\n", addr & ~0xff, addr & 0xff, data);
 
     // Set data ACCORDING TO HOW THE FLASH WORKS
     page->data[addr & 0xff] &= data;
@@ -361,8 +363,12 @@ void w25q_cmd(uint8_t * buf, size_t len)
 {
     int i;
     bool read_data = false;
+    enum spi_bit_mode_e prevmode = spi_data_mode();
 
-    fprintf(stderr, "Call from emscripten buf[0] = 0x%x len = %zu\n", buf[0], len);
+    if (prevmode == E_SPI_16BIT)
+    {
+    	spi_set_8bit_mode();
+    }
 
     toggle_cs(0);
 
@@ -379,26 +385,54 @@ void w25q_cmd(uint8_t * buf, size_t len)
 
     toggle_cs(1);
 
+    if (prevmode == E_SPI_16BIT)
+    {
+    	spi_set_16bit_mode();
+    }
+
     // Print out if this is a data read
     if (read_data)
     {
         for (i = 4; i < len; ++i)
         {
+            printf("%02x ", buf[i]);
+
             if (((i - 4 + 1) % 16) == 0)
             {
                 printf("\n");
             }
 
-            printf("%02x ", buf[i]);
         }
-    }
 
-    printf("\n");
+	    printf("\n");
+    }
+}
+
+static void setup()
+{
+	uint8_t first[] = {0x02, 0x01, 0x00, 0x00, 0, 0, 0, 0, 98, 51, 166, 218, 12, 111, 96, 115, 78, 17, 138, 184, 20, 64, 97, 115, 67, 13, 138, 249, 28, 1, 123, 59, 72, 12, 206, 184, 71, 89, 61, 99, 17, 79, 223, 229, 119};
+	uint8_t second[] = {0x02, 0x02, 0x00, 0x00, 75, 64, 111, 230, 163, 212, 50, 27, 38, 40, 183, 198, 255, 245, 252, 159, 110, 97, 113, 56, 72, 62, 249, 134, 156, 184, 76, 156, 192, 210, 114, 163, 222, 144, 231, 208, 174, 131, 56, 176, 122, 172, 56, 148, 117, 116, 105, 0, 65, 93, 57, 65, 222, 208, 228, 227, 173, 197, 69, 152, 66, 220, 165, 141};
+	uint8_t third[] = {0x02, 0x03, 0x00, 0x00, 32, 0, 0, 0, 247, 96, 74, 31, 94, 150, 57, 126, 150, 245, 158, 49, 114, 11, 217, 0, 215, 107, 237, 200, 209, 209, 71, 52, 129, 70, 154, 36, 191, 170, 144, 34, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255};
+	uint8_t fourth[] = {0x02, 0x04, 0x00, 0x00, 64, 0, 0, 0, 142, 60, 90, 245, 86, 130, 212, 12, 90, 38, 219, 29, 113, 243, 207, 17, 112, 218, 203, 157, 48, 112, 255, 94, 126, 249, 123, 170, 70, 178, 4, 7, 241, 45, 43, 70, 140, 134, 86, 219, 212, 85, 202, 85, 68, 213, 100, 164, 32, 79, 86, 197, 163, 240, 58, 229, 84, 2, 213, 241, 221, 40, 153, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255};
+	uint8_t fifth[] = {0x02, 0x05, 0x00, 0x00, 0x0, 0x0, 0x0, 0x0};
+	uint8_t wel_cmd[] = {0x06};
+	uint8_t nwel_cmd[] = {0x04};
+
+	w25q_cmd(wel_cmd, 1);
+	w25q_cmd(first, sizeof(first));
+	w25q_cmd(second, sizeof(second));
+	w25q_cmd(third, sizeof(third));
+	w25q_cmd(fourth, sizeof(fourth));
+	w25q_cmd(fifth, sizeof(fifth));
+	w25q_cmd(nwel_cmd, 1);
 }
 
 #endif
 
 void w25q_init()
 {
+#ifdef WASM
+	setup();
+#endif
     gpio_register_portc_cb(toggle_cs, 4);
 }

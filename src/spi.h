@@ -25,6 +25,9 @@ extern struct spi_regs_s spi;
 
 enum spi_bit_mode_e spi_data_mode();
 
+void spi_set_8bit_mode();
+void spi_set_16bit_mode();
+
 void spi_write(struct memarea_s * area, uint32_t addr, uint32_t val, int res);
 
 uint32_t spi_read(struct memarea_s * area, uint32_t addr, int res);

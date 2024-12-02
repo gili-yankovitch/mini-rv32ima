@@ -27,6 +27,16 @@ enum spi_bit_mode_e spi_data_mode()
     return (spi.SPI_CTLR1 & (0b1 << 11)) ? E_SPI_16BIT : E_SPI_8BIT;
 }
 
+void spi_set_8bit_mode()
+{
+	spi.SPI_CTLR1 &= ~(0b1 << 11);
+}
+
+void spi_set_16bit_mode()
+{
+	spi.SPI_CTLR1 |= 0b1 << 11;
+}
+
 static uint32_t spi_write_device(uint32_t val)
 {
     uint32_t res;

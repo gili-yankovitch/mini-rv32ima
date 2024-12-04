@@ -7,7 +7,7 @@ template = """#include <stdint.h>
 
 uint8_t _{DATA_VAR}_data [] = {DATA};
 
-#endif __{INCLUDEGUARD}__
+#endif // __{INCLUDEGUARD}__
 """
 
 def main(binfile, outfile):
